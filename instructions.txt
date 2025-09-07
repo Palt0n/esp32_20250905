@@ -1,0 +1,53 @@
+Recommended ESP32 Pin Assignments (use only these for all motor logic):
+	int PIN_U1_EN   = 13;
+	int PIN_U1_STEP = 14;
+	int PIN_U1_DIR  = 15;
+	int PERIOD      = 150;
+	// Use GPIO 2 for the built-in LED, or GPIO 13 for an external LED if needed.
+Design Instructions for main.cpp
+--------------------------------
+
+0. Always update this instruction file before making any edits to the script
+
+1. WiFi credentials are provided at compile time:
+	- Store your WiFi SSID and password in `include/wifi_secrets.h`.
+	- The main code includes `wifi_secrets.h` and uses `WIFI_SSID` and `WIFI_PASS` macros.
+	- Do not commit `wifi_secrets.h` to version control (it's in `.gitignore`).
+
+2. WiFi connection and auto-reconnect:
+	- Use the ESP32 WiFi library (`#include <WiFi.h>`).
+	- In `setup()`, connect to WiFi using the credentials from `wifi_secrets.h`.
+	- Use the event `ARDUINO_EVENT_WIFI_STA_DISCONNECTED` for auto-reconnect logic.
+	- Print the local IP address to the serial monitor after connecting.
+	- Never commit your WiFi credentials or generated secrets header to version control.
+	- Always use the generated header for credentials, not hardcoded values in your source code.
+
+
+3. Webserver and control page:
+
+4. Stepper motor fixed-step movement:
+	- Add new web endpoints and buttons labeled "Move Up 100 Steps" and "Move Down 100 Steps".
+	- When triggered, the ESP32 should move the stepper motor UP or DOWN by exactly 100 steps, then stop automatically.
+	- While the stepper is moving a fixed number of steps, no other web requests (including move, stop, or period changes) should be accepted until the move is complete.
+	- The web page should update to reflect the current state (show STOP after the move is complete).
+	- These actions should not interfere with the continuous Move Up/Down/Stop logic.
+	- The number of steps (100) should be clearly documented and easy to change in the code.
+	- Use the `ESPAsyncWebServer` library for the webserver.
+	- Set up a basic HTTP server that listens on port 80.
+	- Serve a basic HTML web page with three buttons: "Move Up", "Stop", and "Move Down".
+	- Each button acts as a toggle: press once to start the action, press again (or press Stop) to stop.
+	- Each button sends a request to the ESP32 to perform the corresponding action (move up, stop, move down).
+	- Handle each button press on the server side to control the stepper motor logic accordingly (U1 only; U2 is not used).
+	- The LED toggle logic should be kept and available on the web page, with a button labeled "Toggle LED".
+	- The web page should display the current state of the LED (ON/OFF) and the current state of the motor (UP, DOWN, or STOP).
+	- The web page must also include a user input field (number box) to set the value of PERIOD (stepper speed/delay in microseconds), and a button to submit the new value.
+	- When the user submits a new PERIOD value, the server must update the period used for stepper control and display the current value on the web page.
+	- Use recommended ESP32 GPIO pins for all assignments (see above for safe choices).
+	- Motor and LED controls are independent and do not affect each other.
+	- The LED state, the motor state, and the PERIOD value should be saved and restored after reset or power loss using the Preferences API.
+	- Use the appropriate GPIO pins for motor and control as described above.
+	- Ensure the server starts after WiFi connection is established.
+
+
+// All stepper motor and control logic must use only the U1 pin assignments listed above.
+// Ignore any legacy or U2 pin references. The main.cpp must match these assignments and requirements.
