@@ -38,7 +38,8 @@ MotorState motorState = MOTOR_STOP;
 volatile bool isMovingSteps = false;
 volatile int stepsToMove = 0;
 volatile int stepDirection = 1; // 1 = UP, -1 = DOWN
-const int FIXED_STEP_COUNT = 100; // Easy to change
+// Default value for fixed-step count
+int fixedStepCount = 100;
 
 void saveMotorState(MotorState state) {
   preferences.begin("motor", false);
@@ -112,6 +113,10 @@ const char index_html[] PROGMEM = R"rawliteral(
       <input type="number" name="period" min="10" max="10000" value="%PERIOD%" required %DISABLED%>
       <button type="submit" %DISABLED%>Set PERIOD</button>
     </form>
+    <form action="/setsteps" method="POST" style="margin-bottom:16px;">
+      <input type="number" name="steps" min="1" max="10000" value="%STEPS%" required %DISABLED%>
+      <button type="submit" %DISABLED%>Set Steps</button>
+    </form>
     <form action="/moveup" method="POST" style="display:inline;">
       <button type="submit" %DISABLED%>Move Up</button>
     </form>
@@ -122,10 +127,10 @@ const char index_html[] PROGMEM = R"rawliteral(
       <button type="submit" %DISABLED%>Move Down</button>
     </form>
     <form action="/moveupsteps" method="POST" style="display:inline; margin-left:20px;">
-      <button type="submit" %DISABLED%>Move Up 100 Steps</button>
+      <button type="submit" %DISABLED%>Move Up %STEPS% Steps</button>
     </form>
     <form action="/movedownsteps" method="POST" style="display:inline;">
-      <button type="submit" %DISABLED%>Move Down 100 Steps</button>
+      <button type="submit" %DISABLED%>Move Down %STEPS% Steps</button>
     </form>
     <form action="/toggleled" method="POST" style="display:inline; margin-left:20px;">
       <button type="submit" %DISABLED%>Toggle LED</button>
@@ -176,6 +181,7 @@ void setup() {
     html.replace("%LED_STATE%", ledState ? "ON" : "OFF");
     html.replace("%MOTOR_STATE%", getMotorStateString());
     html.replace("%PERIOD%", String(period));
+    html.replace("%STEPS%", String(fixedStepCount));
     // Disable all controls if moving steps
     if (isMovingSteps) {
       html.replace("%DISABLED%", "disabled");
@@ -183,6 +189,20 @@ void setup() {
       html.replace("%DISABLED%", "");
     }
     request->send(200, "text/html", html);
+  });
+  // Handler to set the number of steps for fixed-step move
+  server.on("/setsteps", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (isMovingSteps) {
+      request->redirect("/");
+      return;
+    }
+    if (request->hasParam("steps", true)) {
+      int newSteps = request->getParam("steps", true)->value().toInt();
+      if (newSteps >= 1 && newSteps <= 10000) {
+        fixedStepCount = newSteps;
+      }
+    }
+    request->redirect("/");
   });
 
   server.on("/setperiod", HTTP_POST, [](AsyncWebServerRequest *request){
@@ -258,6 +278,37 @@ void setup() {
     }
     motorState = MOTOR_STOP;
     saveMotorState(motorState);
+    request->redirect("/");
+  });
+
+  // Handler for Move Up 100 Steps (waits until done)
+  server.on("/moveupsteps", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (isMovingSteps) {
+      request->redirect("/");
+      return;
+    }
+    isMovingSteps = true;
+    stepsToMove = fixedStepCount;
+    stepDirection = 1; // UP
+    // Wait until move is done
+    while (isMovingSteps) {
+      delay(10);
+    }
+    request->redirect("/");
+  });
+
+  server.on("/movedownsteps", HTTP_POST, [](AsyncWebServerRequest *request){
+    if (isMovingSteps) {
+      request->redirect("/");
+      return;
+    }
+    isMovingSteps = true;
+    stepsToMove = fixedStepCount;
+    stepDirection = -1; // DOWN
+    // Wait until move is done
+    while (isMovingSteps) {
+      delay(10);
+    }
     request->redirect("/");
   });
 
